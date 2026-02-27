@@ -32,3 +32,11 @@ class Booking(BookingBase):
     booking_date: Optional[datetime] = None
     status: str
     model_config = ConfigDict(from_attributes=True)
+
+class LineageBase(BaseModel):
+    name: str
+    image: str
+
+class Lineage(LineageBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)

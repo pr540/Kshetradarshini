@@ -1,8 +1,17 @@
 import axios from 'axios';
+import Constants from 'expo-constants';
 
-// Auto-detect the backend IP
-const API_BASE_URL = 'http://192.168.1.15:8082'; // Your computer IP
-// If you use tunnel mode, change this to your tunnel URL or use a dynamic logic
+// Get the computer's IP address automatically for development
+const getBaseUrl = () => {
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(':')[0];
+    return `http://${ip}:8082`;
+  }
+  return 'http://192.168.1.15:8082'; // Fallback to your IP
+};
+
+const API_BASE_URL = getBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -17,6 +26,16 @@ export const getSevas = async () => {
     return response.data;
   } catch (error) {
     console.error('Error fetching sevas:', error);
+    throw error;
+  }
+};
+
+export const getLineage = async () => {
+  try {
+    const response = await api.get('/lineage');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching lineage:', error);
     throw error;
   }
 };

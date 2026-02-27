@@ -22,8 +22,40 @@ def read_root():
     return {
         "status": "online",
         "message": "Kshetradarshini API Gateway is running",
-        "available_endpoints": ["/sevas", "/bookings"]
+        "available_endpoints": ["/sevas", "/bookings", "/lineage"]
     }
+
+@app.get("/lineage", response_model=List[schemas.Lineage])
+def get_lineage():
+    try:
+        conn = get_db_connection()
+        if conn is None:
+            # Fallback to mock data
+            return [
+                {"id": 1, "name": "Acharya 1 (from API)", "image": "https://api.a0.dev/assets/image?text=hindu%20acharya%20portrait&aspect=1:1"},
+                {"id": 2, "name": "Acharya 2 (from API)", "image": "https://api.a0.dev/assets/image?text=spiritual%20guru%20portrait&aspect=1:1"},
+                {"id": 3, "name": "Acharya 3 (from API)", "image": "https://api.a0.dev/assets/image?text=monk%20portrait&aspect=1:1"},
+                {"id": 4, "name": "Acharya 4 (from API)", "image": "https://api.a0.dev/assets/image?text=vedic%20scholar%20portrait&aspect=1:1"},
+                {"id": 5, "name": "Acharya 5 (from API)", "image": "https://api.a0.dev/assets/image?text=sanyasi%20portrait&aspect=1:1"}
+            ]
+        
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute("SELECT * FROM lineage")
+            return cursor.fetchall()
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        print(f"ERROR IN /lineage: {e}")
+        # Fallback to avoid breaking UI
+        return [
+                {"id": 1, "name": "Acharya 1 (from API)", "image": "https://api.a0.dev/assets/image?text=hindu%20acharya%20portrait&aspect=1:1"},
+                {"id": 2, "name": "Acharya 2 (from API)", "image": "https://api.a0.dev/assets/image?text=spiritual%20guru%20portrait&aspect=1:1"},
+                {"id": 3, "name": "Acharya 3 (from API)", "image": "https://api.a0.dev/assets/image?text=monk%20portrait&aspect=1:1"},
+                {"id": 4, "name": "Acharya 4 (from API)", "image": "https://api.a0.dev/assets/image?text=vedic%20scholar%20portrait&aspect=1:1"},
+                {"id": 5, "name": "Acharya 5 (from API)", "image": "https://api.a0.dev/assets/image?text=sanyasi%20portrait&aspect=1:1"}
+            ]
 
 @app.get("/sevas", response_model=List[schemas.Seva])
 def get_sevas():

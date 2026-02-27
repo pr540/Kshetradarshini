@@ -9,6 +9,8 @@ import {
   ScrollView,
   StatusBar,
   Dimensions,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, MapPin, ChevronRight, Home, Calendar, User as UserIcon } from 'lucide-react-native';
@@ -59,24 +61,71 @@ const SEVAS_DATA = [
   },
 ];
 
-import { getSevas } from '../services/api';
+import { getSevas, getLineage } from '../services/api';
+
+import { useFocusEffect } from '@react-navigation/native';
+import * as Location from 'expo-location';
 
 const HomeScreen = ({ route, navigation }) => {
   const { userEmail } = route.params || { userEmail: 'devotee@temple.com' };
   const [sevas, setSevas] = useState([]);
+  const [lineage, setLineage] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [locationName, setLocationName] = useState('Fetching location...');
 
-  useEffect(() => {
-    fetchSevas();
+  // Use useFocusEffect to ensure sevas reflect latest DB state every time user returns to Home
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchData();
+      getCurrentLocation();
+    }, [])
+  );
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    fetchData().then(() => setRefreshing(false));
+    getCurrentLocation();
   }, []);
 
-  const fetchSevas = async () => {
+  const getCurrentLocation = async () => {
     try {
-      const data = await getSevas();
-      setSevas(data);
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationName('Hitec City, Hyderabad');
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      let reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      if (reverseGeocode.length > 0) {
+        let address = reverseGeocode[0];
+        setLocationName(`${address.city || address.region}, ${address.region}`);
+      } else {
+        setLocationName('Hyderabad, TS');
+      }
+    } catch (error) {
+      console.log('Location error:', error);
+      setLocationName('Temple Proximity... (Hyderabad)');
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      const [sevasData, lineageData] = await Promise.all([
+        getSevas().catch(() => SEVAS_DATA),
+        getLineage().catch(() => LINEAGE_DATA)
+      ]);
+      setSevas(sevasData);
+      setLineage(lineageData);
     } catch (err) {
-      console.log('Error fetching sevas, using fallback data');
+      console.log('Error fetching data');
       setSevas(SEVAS_DATA);
+      setLineage(LINEAGE_DATA);
     } finally {
       setLoading(false);
     }
@@ -117,7 +166,10 @@ const HomeScreen = ({ route, navigation }) => {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Kshetradarshini</Text>
-          <Text style={styles.headerSubtitle}>Book your divine seva</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <MapPin size={12} color={COLORS.secondary} style={{ marginRight: 4 }} />
+            <Text style={styles.headerSubtitle}>{locationName}</Text>
+          </View>
         </View>
         <TouchableOpacity
           style={styles.profileIcon}
@@ -127,40 +179,51 @@ const HomeScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+        }
+      >
         <View style={styles.content}>
-          <View style={styles.bannerCard}>
-            <View style={styles.bannerTag}>
-              <Text style={styles.bannerTagText}>🙏 Kanchi Peetham Acharyas</Text>
-            </View>
-            <Text style={styles.bannerTitle}>Blessings of the Divine Lineage</Text>
+          {loading && !refreshing ? (
+            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
+          ) : (
+            <>
+                <View style={styles.bannerCard}>
+                  <View style={styles.bannerTag}>
+                    <Text style={styles.bannerTagText}>🙏 Kanchi Peetham Acharyas</Text>
+                  </View>
+                  <Text style={styles.bannerTitle}>Blessings of the Divine Lineage</Text>
 
-            <View style={styles.lineageListContainer}>
-              <FlatList
-                horizontal
-                data={LINEAGE_DATA}
-                renderItem={renderLineageItem}
-                keyExtractor={(item) => item.id}
-                showsHorizontalScrollIndicator={false}
-              />
-            </View>
-            <View style={styles.pagination}>
-              <View style={[styles.dot, styles.activeDot]} />
-              <View style={styles.dot} />
-              <View style={styles.dot} />
-            </View>
-          </View>
+                  <View style={styles.lineageListContainer}>
+                    <FlatList
+                      horizontal
+                      data={lineage.length > 0 ? lineage : LINEAGE_DATA}
+                      renderItem={renderLineageItem}
+                      keyExtractor={(item) => item.id.toString()}
+                      showsHorizontalScrollIndicator={false}
+                    />
+                  </View>
+                  <View style={styles.pagination}>
+                    <View style={[styles.dot, styles.activeDot]} />
+                    <View style={styles.dot} />
+                    <View style={styles.dot} />
+                  </View>
+                </View>
 
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Available Sevas</Text>
-            <TouchableOpacity>
-              <Text style={styles.viewAll}>View All</Text>
-            </TouchableOpacity>
-          </View>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Available Sevas</Text>
+                  <TouchableOpacity>
+                    <Text style={styles.viewAll}>View All</Text>
+                  </TouchableOpacity>
+                </View>
 
-          {sevas.map((item) => (
-            <View key={item.id}>{renderSevaItem({ item })}</View>
-          ))}
+                {sevas.map((item) => (
+                  <View key={item.id}>{renderSevaItem({ item })}</View>
+                ))}
+            </>
+          )}
         </View>
       </ScrollView>
 

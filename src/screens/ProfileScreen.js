@@ -7,10 +7,11 @@ import {
     Image,
     ScrollView,
     Linking,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-    User,
+    User as UserIconProfile,
     Settings,
     CreditCard,
     Bell,
@@ -32,11 +33,23 @@ const ProfileScreen = ({ route, navigation }) => {
         profilePic: 'https://api.a0.dev/assets/image?text=spiritual%20person%20avatar&aspect=1:1',
     };
 
+    const handleMenuPress = (label) => {
+        if (label === 'My Bookings') {
+            navigation.navigate('PreviousPurchasesScreen');
+        } else {
+            Alert.alert(
+                label,
+                `This section (${label}) will be available in the next update.`,
+                [{ text: 'Namaste' }]
+            );
+        }
+    };
+
     const menuItems = [
-        { icon: <User size={22} color={COLORS.primary} />, label: 'Personal Information', screen: 'Profile' },
-        { icon: <CreditCard size={22} color={COLORS.primary} />, label: 'My Bookings', screen: 'PreviousPurchasesScreen' },
-        { icon: <Bell size={22} color={COLORS.primary} />, label: 'Notifications', screen: 'Profile' },
-        { icon: <Settings size={22} color={COLORS.primary} />, label: 'Settings', screen: 'Profile' },
+        { icon: <UserIconProfile size={22} color={COLORS.primary} />, label: 'Personal Information' },
+        { icon: <CreditCard size={22} color={COLORS.primary} />, label: 'My Bookings' },
+        { icon: <Bell size={22} color={COLORS.primary} />, label: 'Notifications' },
+        { icon: <Settings size={22} color={COLORS.primary} />, label: 'Settings' },
     ];
 
     const socialLinks = [
@@ -70,7 +83,7 @@ const ProfileScreen = ({ route, navigation }) => {
                         <TouchableOpacity
                             key={index}
                             style={styles.menuItem}
-                            onPress={() => item.screen && navigation.navigate(item.screen)}
+                            onPress={() => handleMenuPress(item.label)}
                         >
                             <View style={styles.menuIconContainer}>
                                 {item.icon}

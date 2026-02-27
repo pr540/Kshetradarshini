@@ -11,6 +11,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CircleCheck, Download, Share2 } from 'lucide-react-native';
 import { COLORS, SIZES } from '../constants/theme';
 
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+
 const SuccessScreen = ({ route, navigation }) => {
   const { bookingId, seva, totalPrice, name, date } = route.params || {
     bookingId: '#KS-98234',
@@ -30,12 +33,34 @@ const SuccessScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleDownload = () => {
-    Alert.alert(
-      'Download Receipt',
-      'Your receipt is being generated and will be saved to your downloads folder.',
-      [{ text: 'OK' }]
-    );
+  const handleDownload = async () => {
+    const html = `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+        </head>
+        <body style="text-align: center; font-family: 'Helvetica'; padding: 20px;">
+          <h1 style="color: #C62828;">Kshetradarshini</h1>
+          <hr />
+          <h2>Booking Receipt</h2>
+          <div style="background: #FDF7E6; padding: 20px; border-radius: 10px; border: 1px solid #FFC107;">
+            <p><strong>Booking ID:</strong> ${bookingId}</p>
+            <p><strong>Seva:</strong> ${seva.name}</p>
+            <p><strong>Devotee:</strong> ${name}</p>
+            <p><strong>Amount:</strong> ₹${totalPrice}</p>
+            <p><strong>Date:</strong> ${date}</p>
+          </div>
+          <p style="margin-top: 50px; color: #757575;">May the blessings of the divine be with you.</p>
+        </body>
+      </html>
+    `;
+
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+    } catch (error) {
+      Alert.alert('Error', 'Could not generate PDF');
+    }
   };
 
   return (
