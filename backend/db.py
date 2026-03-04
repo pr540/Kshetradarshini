@@ -5,7 +5,7 @@ from mysql.connector import pooling
 db_config = {
     "host": "localhost",
     "user": "root",
-    "password": "root",
+    "password": "root", # Please check if your password is empty or something else
     "database": "kshetradarshini"
 }
 
@@ -19,9 +19,9 @@ def init_pool():
             pool_size=5,
             **db_config
         )
-        print("✅ MySQL Connection Pool Initialized")
+        print("SUCCESS: MySQL Connection Pool Initialized")
     except mysql.connector.Error as err:
-        print(f"❌ Error creating connection pool: {err}")
+        print(f"ERROR creating connection pool: {err}")
 
 # Initialize pool on module load
 init_pool()
@@ -35,13 +35,15 @@ def get_db_connection():
         
     if connection_pool is None:
         init_pool()
+        
     if connection_pool is None:
-        print("⚠️ MySQL failed. Switching to MOCK MODE.")
+        print("WARNING: MySQL failed. Switching to MOCK MODE.")
         MOCK_MODE = True
         return None
+        
     try:
         return connection_pool.get_connection()
-    except:
-        print("⚠️ MySQL connection failed. Switching to MOCK MODE.")
+    except Exception as e:
+        print(f"WARNING: MySQL connection failed: {e}. Switching to MOCK MODE.")
         MOCK_MODE = True
         return None

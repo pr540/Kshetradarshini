@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MapPin, ChevronLeft } from 'lucide-react-native';
+import { MapPin, ChevronLeft, CreditCard, Lock, Bell, Clock } from 'lucide-react-native';
 import { COLORS, SIZES } from '../constants/theme';
 
 const PaymentReviewScreen = ({ route, navigation }) => {
@@ -19,26 +22,68 @@ const PaymentReviewScreen = ({ route, navigation }) => {
     time: '08:00 AM',
     totalPrice: 500
   };
+
   const [selectedMethod, setSelectedMethod] = useState('UPI');
   const [isPaying, setIsPaying] = useState(false);
+  const [timer, setTimer] = useState(240); // 4 minutes in seconds
 
-  const methods = ['UPI', 'Debit Card', 'Credit Card', 'Net Banking'];
+  useEffect(() => {
+    if (timer === 0) {
+      Alert.alert(
+        'Session Expired',
+        'Your payment session has timed out after 4 minutes. Please try again.',
+        [{ text: 'OK', onPress: () => navigation.navigate('HomeScreen') }]
+      );
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setTimer((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [timer]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const methods = [
+    { id: 'UPI', label: 'UPI (PhonePe, GPay)', icon: '📱' },
+    { id: 'Debit', label: 'Debit Card', icon: '💳' },
+    { id: 'Credit', label: 'Credit Card', icon: '🏦' },
+    { id: 'Wallet', label: 'Wallets', icon: '👛' },
+  ];
 
   const handlePay = () => {
     setIsPaying(true);
-    // Mocking payment gateway delay
+
+    // Simulating bank communication
     setTimeout(() => {
       setIsPaying(false);
-      navigation.navigate('SuccessScreen', {
-        bookingId: 'KS-' + Math.floor(Math.random() * 90000 + 10000),
-        seva,
-        count,
-        name,
-        date,
-        time,
-        totalPrice
-      });
-    }, 2000);
+      // Fail if timer is too low or random 10% failure
+      const isRandomFail = Math.random() < 0.1;
+
+      if (!isRandomFail && timer > 0) {
+        navigation.navigate('SuccessScreen', {
+          bookingId: 'KS-' + Math.floor(Math.random() * 90000 + 10000),
+          seva,
+          count,
+          name,
+          date,
+          time,
+          totalPrice
+        });
+      } else {
+        Alert.alert(
+          'Payment Unsuccessful',
+          'Transaction was declined by the bank or the session expired. Please verify your details and try again.',
+          [{ text: 'Try Again' }]
+        );
+      }
+    }, 2500);
   };
 
   return (
@@ -47,8 +92,13 @@ const PaymentReviewScreen = ({ route, navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ChevronLeft size={28} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Review & Pay</Text>
-        <View style={{ width: 28 }} />
+        <Text style={styles.headerTitle}>Checkout</Text>
+        <View style={[styles.timerContainer, timer < 60 && styles.timerWarning]}>
+          <Clock size={16} color={timer < 60 ? '#FFF' : COLORS.primary} />
+          <Text style={[styles.timerText, timer < 60 && { color: '#FFF' }]}>
+            {formatTime(timer)}
+          </Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -63,30 +113,29 @@ const PaymentReviewScreen = ({ route, navigation }) => {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Booking Summary</Text>
+          <View style={styles.cardHeader}>
+            <Bell size={20} color={COLORS.primary} />
+            <Text style={styles.cardTitle}>Booking Summary</Text>
+          </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Seva</Text>
+            <Text style={styles.summaryLabel}>Seva Name</Text>
             <Text style={styles.summaryValue}>{seva.name}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Devotee</Text>
-            <Text style={styles.summaryValue}>{name}</Text>
+            <Text style={styles.summaryValue}>{name || 'Devotee'}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Date</Text>
-            <Text style={styles.summaryValue}>{date}</Text>
+            <Text style={styles.summaryLabel}>Schedule</Text>
+            <Text style={styles.summaryValue}>{date} • {time}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Time</Text>
-            <Text style={styles.summaryValue}>{time}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Persons</Text>
+            <Text style={styles.summaryLabel}>Total Persons</Text>
             <Text style={styles.summaryValue}>{count}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalLabel}>Total Payable</Text>
             <Text style={styles.totalValue}>₹{totalPrice}</Text>
           </View>
         </View>
@@ -95,34 +144,42 @@ const PaymentReviewScreen = ({ route, navigation }) => {
         <View style={styles.methodsContainer}>
           {methods.map((method) => (
             <TouchableOpacity
-              key={method}
+              key={method.id}
               style={[
-                styles.methodChip,
-                selectedMethod === method && styles.activeMethodChip,
+                styles.methodItem,
+                selectedMethod === method.id && styles.activeMethodItem,
               ]}
-              onPress={() => setSelectedMethod(method)}
+              onPress={() => setSelectedMethod(method.id)}
             >
-              <Text
-                style={[
-                  styles.methodText,
-                  selectedMethod === method && styles.activeMethodText,
-                ]}
-              >
-                {method}
+              <Text style={styles.methodIcon}>{method.icon}</Text>
+              <Text style={[styles.methodText, selectedMethod === method.id && styles.activeMethodText]}>
+                {method.label}
               </Text>
+              <View style={[styles.radio, selectedMethod === method.id && styles.radioActive]} />
             </TouchableOpacity>
           ))}
+        </View>
+
+        <View style={styles.securityNote}>
+          <Lock size={14} color="#757575" />
+          <Text style={styles.securityText}>Payments are 100% Secure & Encrypted</Text>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.payButton, isPaying && { opacity: 0.7 }]}
-          onPress={handlePay}
-          disabled={isPaying}
-        >
-          <Text style={styles.payButtonText}>{isPaying ? 'Contacting Gateway...' : 'Confirm & Pay'}</Text>
-        </TouchableOpacity>
+        {isPaying ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Verifying with Bank...</Text>
+          </View>
+        ) : (
+            <TouchableOpacity
+              style={styles.payButton}
+              onPress={handlePay}
+            >
+              <Text style={styles.payButtonText}>Pay ₹{totalPrice} Now</Text>
+            </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -131,7 +188,7 @@ const PaymentReviewScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8F9FA',
   },
   header: {
     flexDirection: 'row',
@@ -139,25 +196,47 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SIZES.padding,
     paddingVertical: 15,
+    backgroundColor: COLORS.white,
+    elevation: 4,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.text,
   },
+  timerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  timerWarning: {
+    backgroundColor: '#C62828',
+  },
+  timerText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginLeft: 6,
+  },
   scrollContent: {
     padding: SIZES.padding,
   },
   card: {
     backgroundColor: COLORS.white,
-    borderRadius: SIZES.radius,
-    padding: 16,
+    borderRadius: 15,
+    padding: 18,
     marginBottom: 20,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.05,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
   },
   locationHeader: {
     flexDirection: 'row',
@@ -169,23 +248,20 @@ const styles = StyleSheet.create({
   templeName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: COLORS.text,
   },
   templeAddress: {
     fontSize: 12,
     color: '#757575',
-    marginTop: 2,
   },
   cardTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 15,
+    marginLeft: 10,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   summaryLabel: {
     fontSize: 14,
@@ -193,67 +269,94 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.text,
+    fontWeight: 'bold',
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.border,
+    backgroundColor: '#EEE',
     marginVertical: 12,
   },
   totalLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: COLORS.text,
   },
   totalValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.primary,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: COLORS.text,
     marginBottom: 15,
   },
   methodsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  methodChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
     backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginRight: 10,
-    marginBottom: 10,
+    borderRadius: 15,
+    overflow: 'hidden',
   },
-  activeMethodChip: {
-    borderColor: COLORS.primary,
-    backgroundColor: '#FDECEA',
+  methodItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  activeMethodItem: {
+    backgroundColor: '#FFF8F1',
+  },
+  methodIcon: {
+    fontSize: 20,
+    marginRight: 15,
   },
   methodText: {
-    fontSize: 14,
-    color: COLORS.text,
-    fontWeight: '500',
+    flex: 1,
+    fontSize: 15,
   },
   activeMethodText: {
-    color: COLORS.primary,
     fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#CCC',
+  },
+  radioActive: {
+    borderColor: COLORS.primary,
+    borderWidth: 6,
+  },
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  securityText: {
+    fontSize: 11,
+    color: '#757575',
+    marginLeft: 8,
   },
   footer: {
     padding: SIZES.padding,
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: '#EEE',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontWeight: 'bold',
+    color: COLORS.primary,
   },
   payButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: 16,
-    borderRadius: SIZES.radius,
+    paddingVertical: 18,
+    borderRadius: 12,
     alignItems: 'center',
   },
   payButtonText: {
