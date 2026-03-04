@@ -3,8 +3,13 @@ from mysql.connector import errorcode
 
 def init_db():
     try:
-        # Connect without database first
-        cnx = mysql.connector.connect(user='root', password='root', host='localhost')
+        # Try with root/root
+        try:
+            cnx = mysql.connector.connect(user='root', password='root', host='localhost')
+        except:
+            # Try with empty password
+            cnx = mysql.connector.connect(user='root', password='', host='localhost')
+            
         cursor = cnx.cursor()
         
         # Create DB
@@ -46,6 +51,14 @@ def init_db():
             "  `num_persons` int(11) NOT NULL,"
             "  `total_price` float NOT NULL,"
             "  `status` varchar(20) DEFAULT 'pending',"
+            "  PRIMARY KEY (`id`)"
+            ") ENGINE=InnoDB")
+
+        tables['lineage'] = (
+            "CREATE TABLE IF NOT EXISTS `lineage` ("
+            "  `id` int(11) NOT NULL AUTO_INCREMENT,"
+            "  `name` varchar(255) NOT NULL,"
+            "  `image` varchar(500) NOT NULL,"
             "  PRIMARY KEY (`id`)"
             ") ENGINE=InnoDB")
 

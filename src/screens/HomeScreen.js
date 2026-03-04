@@ -9,10 +9,16 @@ import {
   ScrollView,
   StatusBar,
   Dimensions,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, MapPin, ChevronRight, Home, Calendar, User as UserIcon } from 'lucide-react-native';
 import { COLORS, SIZES } from '../constants/theme';
+import { getSevas, getLineage } from '../services/api';
+import { useFocusEffect } from '@react-navigation/native';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
@@ -25,58 +31,71 @@ const LINEAGE_DATA = [
 ];
 
 const SEVAS_DATA = [
-  {
-    id: '1',
-    name: 'Go Seva',
-    location: 'Kanchipeetam Temple',
-    price: '₹500',
-    time: 'Morning',
-    icon: '🐄',
-  },
-  {
-    id: '2',
-    name: 'Veda Rakshana',
-    location: 'Kanchipeetam Temple',
-    price: '₹1,000',
-    time: 'Evening',
-    icon: '📿',
-  },
-  {
-    id: '3',
-    name: 'Aalya Seva',
-    location: 'Kanchipeetam Temple',
-    price: '₹750',
-    time: 'All Day',
-    icon: '🏛️',
-  },
-  {
-    id: '4',
-    name: 'Maha Rudrabhishekam',
-    location: 'Kanchipeetam Temple',
-    price: '₹1,500',
-    time: 'Weekend',
-    icon: '🔱',
-  },
+  { id: '1', name: 'Go Seva', location: 'Kanchipeetam Temple', price: '₹500', time: 'Morning', icon: '🐄' },
+  { id: '2', name: 'Veda Rakshana', location: 'Kanchipeetam Temple', price: '₹1,000', time: 'Evening', icon: '📿' },
+  { id: '3', name: 'Aalya Seva', location: 'Kanchipeetam Temple', price: '₹750', time: 'All Day', icon: '🏛️' },
+  { id: '4', name: 'Maha Rudrabhishekam', location: 'Kanchipeetam Temple', price: '₹1,500', time: 'Weekend', icon: '🔱' },
 ];
-
-import { getSevas } from '../services/api';
 
 const HomeScreen = ({ route, navigation }) => {
   const { userEmail } = route.params || { userEmail: 'devotee@temple.com' };
-  const [sevas, setSevas] = useState([]);
+  const [sevas, setSevas] = useState(SEVAS_DATA);
+  const [lineage, setLineage] = useState(LINEAGE_DATA);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [locationName, setLocationName] = useState('Fetching location...');
 
-  useEffect(() => {
-    fetchSevas();
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchData();
+      getCurrentLocation();
+    }, [])
+  );
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    fetchData().then(() => setRefreshing(false));
+    getCurrentLocation();
   }, []);
 
-  const fetchSevas = async () => {
+  const getCurrentLocation = async () => {
     try {
-      const data = await getSevas();
-      setSevas(data);
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationName('Hitec City, Hyderabad');
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      let reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+
+      if (reverseGeocode.length > 0) {
+        let address = reverseGeocode[0];
+        const displayLoc = address.city || address.region || address.district || 'Hyderabad';
+        setLocationName(`${displayLoc}, ${address.region || 'TS'}`);
+      } else {
+        setLocationName('Hyderabad, TS');
+      }
+    } catch (error) {
+      console.log('Location Error:', error.message);
+      setLocationName('Temple Proximity... (HYD)');
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      const [sevasData, lineageData] = await Promise.all([
+        getSevas().catch(() => null),
+        getLineage().catch(() => null)
+      ]);
+
+      if (sevasData) setSevas(Array.isArray(sevasData) ? sevasData : sevasData.sevas || SEVAS_DATA);
+      if (lineageData) setLineage(Array.isArray(lineageData) ? lineageData : lineageData.lineage || LINEAGE_DATA);
     } catch (err) {
-      console.log('Error fetching sevas, using fallback data');
-      setSevas(SEVAS_DATA);
+      console.log('Fetch Data Error:', err.message);
     } finally {
       setLoading(false);
     }
@@ -98,15 +117,11 @@ const HomeScreen = ({ route, navigation }) => {
       </View>
       <View style={styles.sevaInfo}>
         <Text style={styles.sevaName}>{item.name}</Text>
-        <Text style={styles.sevaLocationText}>{item.location}</Text>
+        <Text style={styles.sevaLoc}>{item.location}</Text>
       </View>
-      <View style={styles.sevaPriceContainer}>
-        <Text style={styles.sevaPriceText}>
-          {typeof item.price === 'number' ? `₹${item.price}` : item.price}
-        </Text>
-        <View style={styles.timeTag}>
-          <Text style={styles.timeTagText}>{item.time}</Text>
-        </View>
+      <View style={styles.priceTag}>
+        <Text style={styles.priceTxt}>{item.price}</Text>
+        <Text style={styles.timeTxt}>{item.time}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -116,71 +131,51 @@ const HomeScreen = ({ route, navigation }) => {
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Kshetradarshini</Text>
-          <Text style={styles.headerSubtitle}>Book your divine seva</Text>
+          <Text style={styles.logoText}>Kshetradarshini</Text>
+          <View style={styles.locRow}>
+            <MapPin size={14} color={COLORS.secondary} />
+            <Text style={styles.locText}>{locationName}</Text>
+          </View>
         </View>
-        <TouchableOpacity
-          style={styles.profileIcon}
-          onPress={() => navigation.navigate('ProfileScreen', { email: userEmail })}
-        >
-          <Text style={styles.profileInitial}>H</Text>
+        <TouchableOpacity style={styles.pfp} onPress={() => navigation.navigate('ProfileScreen', { email: userEmail })}>
+          <UserIcon size={24} color="white" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
+      >
         <View style={styles.content}>
-          <View style={styles.bannerCard}>
-            <View style={styles.bannerTag}>
-              <Text style={styles.bannerTagText}>🙏 Kanchi Peetham Acharyas</Text>
-            </View>
-            <Text style={styles.bannerTitle}>Blessings of the Divine Lineage</Text>
-
-            <View style={styles.lineageListContainer}>
-              <FlatList
-                horizontal
-                data={LINEAGE_DATA}
-                renderItem={renderLineageItem}
-                keyExtractor={(item) => item.id}
-                showsHorizontalScrollIndicator={false}
-              />
-            </View>
-            <View style={styles.pagination}>
-              <View style={[styles.dot, styles.activeDot]} />
-              <View style={styles.dot} />
-              <View style={styles.dot} />
-            </View>
+          <View style={styles.banner}>
+            <Text style={styles.bannerTitle}>Spiritual Lineage</Text>
+            <FlatList
+              horizontal
+              data={lineage}
+              renderItem={renderLineageItem}
+              keyExtractor={(item) => item.id.toString()}
+              showsHorizontalScrollIndicator={false}
+            />
           </View>
 
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Available Sevas</Text>
-            <TouchableOpacity>
-              <Text style={styles.viewAll}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {sevas.map((item) => (
-            <View key={item.id}>{renderSevaItem({ item })}</View>
-          ))}
+          <Text style={styles.sectionTitle}>Available Sevas</Text>
+          {loading && !refreshing ? (
+            <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 20 }} />
+          ) : (
+            sevas.map(item => <View key={item.id}>{renderSevaItem({ item })}</View>)
+          )}
         </View>
       </ScrollView>
 
-      {/* Bottom Tab Mock */}
-      <View style={styles.bottomTab}>
-        <TouchableOpacity style={styles.tabItem}>
+      <View style={styles.tabs}>
+        <TouchableOpacity style={styles.tab} onPress={() => { }}>
           <Home size={24} color={COLORS.primary} />
           <Text style={[styles.tabText, { color: COLORS.primary }]}>Home</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.tabItem}
-          onPress={() => navigation.navigate('PreviousPurchasesScreen')}
-        >
+        <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('PreviousPurchasesScreen')}>
           <Calendar size={24} color="#757575" />
           <Text style={styles.tabText}>Bookings</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.tabItem}
-          onPress={() => navigation.navigate('ProfileScreen', { email: userEmail })}
-        >
+        <TouchableOpacity style={styles.tab} onPress={() => navigation.navigate('ProfileScreen', { email: userEmail })}>
           <UserIcon size={24} color="#757575" />
           <Text style={styles.tabText}>Profile</Text>
         </TouchableOpacity>
@@ -190,200 +185,30 @@ const HomeScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    backgroundColor: COLORS.primary,
-    paddingTop: 50,
-    paddingBottom: 25,
-    paddingHorizontal: SIZES.padding,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: COLORS.secondary,
-    fontWeight: '500',
-  },
-  profileIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 22.5,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.secondary,
-  },
-  profileInitial: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
-  content: {
-    paddingHorizontal: SIZES.padding,
-    paddingTop: 20,
-  },
-  bannerCard: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 25,
-    elevation: 8,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-  },
-  bannerTag: {
-    backgroundColor: COLORS.secondary,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-  },
-  bannerTagText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  bannerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 15,
-  },
-  lineageListContainer: {
-    backgroundColor: COLORS.secondary,
-    borderRadius: 10,
-    padding: 10,
-  },
-  lineageItem: {
-    marginRight: 10,
-  },
-  lineageImage: {
-    width: 60,
-    height: 70,
-    borderRadius: 5,
-  },
-  pagination: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 15,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    marginHorizontal: 3,
-  },
-  activeDot: {
-    backgroundColor: COLORS.white,
-    width: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.accent,
-  },
-  viewAll: {
-    fontSize: 14,
-    color: COLORS.accent,
-    fontWeight: '500',
-  },
-  sevaCard: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    borderRadius: 15,
-    padding: 12,
-    marginBottom: 15,
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-  },
-  sevaIconBg: {
-    width: 60,
-    height: 60,
-    borderRadius: 15,
-    backgroundColor: COLORS.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  sevaEmoji: {
-    fontSize: 30,
-  },
-  sevaInfo: {
-    flex: 1,
-  },
-  sevaName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  sevaLocationText: {
-    fontSize: 12,
-    color: '#757575',
-    marginTop: 2,
-  },
-  sevaPriceContainer: {
-    alignItems: 'flex-end',
-  },
-  sevaPriceText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.accent,
-  },
-  timeTag: {
-    backgroundColor: '#FFF3E0',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginTop: 5,
-  },
-  timeTagText: {
-    fontSize: 10,
-    color: COLORS.accent,
-    fontWeight: '500',
-  },
-  bottomTab: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    justifyContent: 'space-around',
-  },
-  tabItem: {
-    alignItems: 'center',
-  },
-  tabText: {
-    fontSize: 12,
-    marginTop: 4,
-    color: '#757575',
-  },
+  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  header: { backgroundColor: COLORS.primary, padding: 20, paddingTop: 50, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  logoText: { color: 'white', fontSize: 22, fontWeight: 'bold' },
+  locRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  locText: { color: COLORS.secondary, fontSize: 13, marginLeft: 4, fontWeight: '500' },
+  pfp: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  content: { padding: 20 },
+  banner: { backgroundColor: COLORS.cardBg, borderRadius: 20, padding: 15, marginBottom: 25 },
+  bannerTitle: { color: 'white', fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
+  lineageItem: { marginRight: 12 },
+  lineageImage: { width: 70, height: 90, borderRadius: 10, borderWeight: 2, borderColor: COLORS.secondary },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.primary, marginBottom: 15 },
+  sevaCard: { flexDirection: 'row', backgroundColor: 'white', padding: 12, borderRadius: 16, marginBottom: 15, alignItems: 'center', elevation: 2 },
+  sevaIconBg: { width: 50, height: 50, borderRadius: 12, backgroundColor: '#FFF3E0', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  sevaEmoji: { fontSize: 24 },
+  sevaInfo: { flex: 1 },
+  sevaName: { fontSize: 16, fontWeight: 'bold' },
+  sevaLoc: { fontSize: 12, color: '#666', marginTop: 2 },
+  priceTag: { alignItems: 'flex-end' },
+  priceTxt: { fontSize: 16, fontWeight: 'bold', color: COLORS.primary },
+  timeTxt: { fontSize: 10, color: '#999', marginTop: 4 },
+  tabs: { flexDirection: 'row', backgroundColor: 'white', padding: 10, borderTopWidth: 1, borderTopColor: '#EEE', justifyContent: 'space-around' },
+  tab: { alignItems: 'center' },
+  tabText: { fontSize: 11, marginTop: 4, color: '#757575' },
 });
 
 export default HomeScreen;

@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Mail, Lock, LogIn, Instagram } from 'lucide-react-native';
@@ -19,10 +20,22 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
 
   const handleLogin = () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter your credentials');
+      return;
+    }
     // Navigate to Home with user info
     navigation.navigate('HomeScreen', {
-      userEmail: email || 'devotee@temple.com'
+      userEmail: email
     });
+  };
+
+  const handleSocialLogin = (platform) => {
+    Alert.alert(
+      'Social Login',
+      `Connecting to your ${platform} account...`,
+      [{ text: 'Continue', onPress: () => navigation.navigate('HomeScreen', { userEmail: `${platform.toLowerCase()}@user.com` }) }]
+    );
   };
 
   return (
@@ -85,7 +98,7 @@ const LoginScreen = ({ navigation }) => {
 
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>Don't have an account? </Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('RegisterScreen')}>
               <Text style={styles.signupLink}>Sign Up</Text>
             </TouchableOpacity>
           </View>
@@ -97,13 +110,13 @@ const LoginScreen = ({ navigation }) => {
               <View style={styles.line} />
             </View>
             <View style={styles.socialButtons}>
-              <TouchableOpacity style={styles.socialBtn}>
+              <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialLogin('Google')}>
                 <Image source={{ uri: 'https://api.a0.dev/assets/image?text=google%20logo&aspect=1:1' }} style={styles.socialIcon} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
+              <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialLogin('Facebook')}>
                 <Image source={{ uri: 'https://api.a0.dev/assets/image?text=facebook%20logo&aspect=1:1' }} style={styles.socialIcon} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
+              <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialLogin('Instagram')}>
                 <Instagram size={24} color="#E4405F" />
               </TouchableOpacity>
             </View>

@@ -29,6 +29,10 @@ const BookingScreen = ({ route, navigation }) => {
   const totalPrice = basePrice * count;
 
   const handleProceed = async () => {
+    if (!name.trim()) {
+      Alert.alert('Validation Error', 'Please enter the Devotee Name before proceeding.');
+      return;
+    }
     setLoading(true);
     try {
       const bookingData = {
