@@ -115,6 +115,8 @@ def create_booking(booking: schemas.BookingCreate):
 @app.get("/bookings/{user_id}", response_model=List[schemas.Booking])
 def get_user_bookings(user_id: int):
     conn = get_db_connection()
+    if conn is None:
+        return []
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT * FROM bookings WHERE user_id = %s", (user_id,))
