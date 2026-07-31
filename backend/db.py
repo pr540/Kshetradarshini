@@ -1,12 +1,14 @@
+import os
 import mysql.connector
 from mysql.connector import pooling
 
-# Update with your actual MySQL credentials
+# Environment configuration for Docker / local development
 db_config = {
-    "host": "localhost",
-    "user": "root",
-    "password": "root", # Please check if your password is empty or something else
-    "database": "kshetradarshini"
+    "host": os.getenv("DB_HOST", "localhost"),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", "root"),
+    "database": os.getenv("DB_NAME", "kshetradarshini"),
+    "port": int(os.getenv("DB_PORT", "3306"))
 }
 
 connection_pool = None
